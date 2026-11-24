@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>POPCAT</title>
+  <link rel="stylesheet" href="ronova.css   " />
+  
+</head>
+<body>
+  <div class="header">
+    <h1>POPCAT</h1>
+    <div id="counter">0</div>
+    <div class="audio-picker" id="audio-picker">
+      <button type="button" class="audio-btn active" data-mode="cycle">Auto Cycle</button>
+      <button type="button" class="audio-btn" data-mode="0">ronova1</button>
+      <button type="button" class="audio-btn" data-mode="1">ronova!</button>
+      <button type="button" class="audio-btn clear-btn" id="clear-count">Clear Count</button>
+      <a href="67.html" class="next-btn">other sound</a>
+    </div>
+  </div>
+
+  <div class="cat-container">
+    <img id="cat-closed" src="closed.png" alt="Pierro cat mouth closed" />
+    <img id="cat-open" src="open.png" alt="Pierro cat mouth open" style="display: none;" />
+  </div>
+
+  <script>
+    let count = Number(localStorage.getItem('popcat_count') || 0);
+    const counter = document.getElementById('counter');
+    const catClosed = document.getElementById('cat-closed');
+    const catOpen = document.getElementById('cat-open');
+    const audioButtons = document.querySelectorAll('.audio-btn');
+    let audioCtx = null;
+
+    const soundFiles = ['ronova2.mp3', 'ronova!.mp3'];
+    const customSounds = soundFiles.map((src) => {
+      const audio = new Audio(src);
+      audio.preload = 'auto';
+      return audio;
+    });
+
+    let soundIndex = 0;
+    let selectedMode = 'cycle';
+    let mouthCloseTimer = null;
+
+    counter.textContent = count.toLocaleString();
+
+    audioButtons.forEach((btn) => {
+      btn.addEventListener('pointerdown', (e) => {
+        e.stopPropagation();
+      });
+
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selectedMode = btn.dataset.mode;
+        audioButtons.forEach((b) => b.classList.toggle('active', b === btn));
+      });
+    });
+
+    function showOpenMouth() {
+      clearTimeout(mouthCloseTimer);
+      if (catClosed) catClosed.style.display = 'none';
+      if (catOpen) catOpen.style.display = 'block';
+    }
+
+    function showClosedMouth() {
+      clearTimeout(mouthCloseTimer);
+      if (catClosed) catClosed.style.display = 'block';
+      if (catOpen) catOpen.style.display = 'none';
+    }
+
+    function playSynthPop() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+
+      const durationSec = 0.08;
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(240, now);
+      osc.frequency.exponentialRampToValueAtTime(640, now + 0.055);
+
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(0.3, now + 0.008);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.075);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + durationSec);
+
+      mouthCloseTimer = setTimeout(showClosedMouth, durationSec * 1000);
+    }
+
+    function getTargetSound() {
+      if (selectedMode === 'cycle') {
+        const sound = customSounds[soundIndex];
+        soundIndex = (soundIndex + 1) % customSounds.length;
+        return sound;
+      }
+      const idx = Number(selectedMode);
+      return customSounds[idx] || null;
+    }
+
+    function playPop() {
+      const sound = getTargetSound();
+
+      if (!sound) {
+        playSynthPop();
+        return;
+      }
+
+      customSounds.forEach((audio) => {
+        audio.pause();
+        audio.currentTime = 0;
+        audio.onended = null;
+      });
+
+      sound.onended = () => {
+        showClosedMouth();
+      };
+
+      const msDuration =
+        Number.isFinite(sound.duration) && sound.duration > 0
+          ? sound.duration * 1000 + 80
+          : 1500;
+
+      mouthCloseTimer = setTimeout(showClosedMouth, msDuration);
+
+      sound.play().catch(() => {
+        playSynthPop();
+      });
+    }
+
+    function triggerPop() {
+      showOpenMouth();
+      count++;
+      counter.textContent = count.toLocaleString();
+      localStorage.setItem('popcat_count', count);
+      playPop();
+    }
+
+    window.addEventListener('pointerdown', triggerPop);
+
+    const keys = new Set();
+    window.addEventListener('keydown', (e) => {
+      if (e.repeat || keys.has(e.code)) return;
+      keys.add(e.code);
+      triggerPop();
+    });
+
+    window.addEventListener('keyup', (e) => {
+      keys.delete(e.code);
+    });
+
+    const clearBtn = document.getElementById('clear-count');
+
+if (clearBtn) {
+  clearBtn.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+  });
+
+  clearBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    count = 0;
+    counter.textContent = count.toLocaleString();
+    localStorage.setItem('popcat_count', '0');
+    showClosedMouth();
+  });
+}
+  </script>
+</body>
+</html>
